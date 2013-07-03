@@ -23,7 +23,7 @@ void myepollLogRaw(int level, const char *msg)
     }
 
     FILE * fp = (0 == strcmp(g_server.logfile, "")) 
-              ? stdout : fopen(g_server.logfile, "a");
+                ? stdout : fopen(g_server.logfile, "a");
     if (!fp) 
     {
         return;
@@ -115,180 +115,206 @@ int loadServerConfig(char *filename)
         return -1;
     }
     
-    char *ptr = NULL;
-    char key[MIN_BUFSZ] = "";
-    char value[MIN_BUFSZ] = "";
-    char buf[MY_CONFIGLINE_MAX] = "";
-    
-    // Load the file content
-    FILE *fp = NULL;
-    if ((fp = fopen(filename, "r")) == NULL) 
+    FILE *fp = fopen(filename, "r");
+    if (NULL == fp) 
     {
         myepollLog(MY_WARNING, 
-                   "Fatal error, can't open config file '%s'", filename);
+                   "Can't open config file '%s'", filename);
         
         return -1;
     }
-        
-    char *line = NULL;
-    size_t len = 0;
-    ssize_t read = 0;
-    int linenum = 1;
+
+    int nRet = 0;
+    int i = 0, line = 0;
+    char buffer[MY_CONFIGLINE_MAX] = "", *buff = NULL;
+    const char *name = NULL;
+    char *value = NULL;
            
-    while ((read = getline(&line, &len, fp)) != -1)
+    while (fgets(buffer, sizeof(buffer), fp))
     {
-        // Skip comments and blank lines
-        if (line[0] == '#' || line[0] == '\0' || line[0] == '\n') 
+        buff = buffer;
+        
+        for (i = 0; i < (int) strlen(buff) - 1 
+             && (buff[i] == ' ' || buff[i] == '\t'); i++);
+        
+        buff += i;
+        line++;
+        
+        if (strlen(buff) <= 2 || buff[0] == '#')
         {
-            linenum++;
-            
             continue;
         }
-
-        // trim ' ' and '\n'
-        for (int i=0, j=0; i<read; i++)
+        
+        if (!(value = strpbrk(buff, " \t"))) 
         {
-            if ((' ' != line[i]) && ('\n' != line[i]))
+            myepollLog(MY_WARNING, 
+                       "Missing argument for option at line %d", line);
+                       
+            nRet = -1;
+            
+			break;
+		}
+		
+		name = buff;
+		*value++ = 0;
+		
+		for (i = 0; i < (int) strlen(value) - 1 
+		     && (value[i] == ' ' || value[i] == '\t'); i++);
+		
+		value += i;
+		
+		for (i = strlen(value); i >= 1 
+		     && (value[i-1] == ' ' || value[i-1] == '\t' || value[i-1] == '\n'); 
+		     i--);
+		
+		if (!i) 
+		{
+			myepollLog(MY_WARNING, 
+			           "Missing argument for option at line %d", line);
+            
+            nRet = -1;
+            
+			break;
+		}
+		
+		value[i] = 0;
+
+        if (0 == strcasecmp(name, "daemonize"))
+        {
+            if (0 == strcasecmp(value, "yes"))
             {
-                buf[j++] = line[i];
+                g_server.daemonize = 1;
+            }
+            else if (0 == strcasecmp(value, "no")) 
+            {
+                g_server.daemonize = 0;
+            }
+            else
+            {
+                myepollLog(MY_WARNING, 
+                           "Argument must be 'yes' or 'no' at line %d", line);
+                
+                nRet = -1;
+            
+			    break;
             }
         }
-        
-        ptr = strstr(buf, "=");
-        if (NULL != ptr)
+        else if (0 == strcasecmp(name, "pidfile"))
         {
-            memset(key, 0x00, sizeof(key));
-            strncpy(key, buf, strlen(buf) - strlen(ptr));
-            memset(value, 0x00, sizeof(value));
-            strcpy(value, ptr + 1);
+            strcpy(g_server.pidfile, value);
+        }
+        else if (0 == strcasecmp(name, "port"))
+        {
+            g_server.port = atoi(value);
+            if (g_server.port < 0 || g_server.port > 65535) 
+            {
+                myepollLog(MY_WARNING, "Invalid port at line %d", line);
+                
+                nRet = -1;
             
-            if (0 == strcasecmp(key, "daemonize"))
-            {
-                if (0 == strcasecmp(value, "yes"))
-                {
-                    g_server.daemonize = 1;
-                }
-                else if (0 == strcasecmp(value, "no")) 
-                {
-                    g_server.daemonize = 0;
-                }
-                else
-                {
-                    myepollLog(MY_WARNING, "argument must be 'yes' or 'no'");
-                    
-                    goto loaderr;
-                }
+			    break;
             }
-            else if (0 == strcasecmp(key, "pidfile"))
+        }
+        else if (0 == strcasecmp(name, "bind"))
+        {
+            strcpy(g_server.bindaddr, value);
+        }
+        else if (0 == strcasecmp(name, "timeout"))
+        {
+            g_server.maxidletime = atoi(value);
+            if (g_server.maxidletime < 0) 
             {
-                strcpy(g_server.pidfile, value);
+                myepollLog(MY_WARNING, 
+                           "Invalid timeout value at line %d", line);
+                
+                nRet = -1;
+            
+			    break;
             }
-            else if (0 == strcasecmp(key, "port"))
+        }
+        else if (0 == strcasecmp(name, "loglevel"))
+        {
+            if (0 == strcasecmp(value, "debug")) 
             {
-                g_server.port = atoi(value);
-                if (g_server.port < 0 || g_server.port > 65535) 
-                {
-                    myepollLog(MY_WARNING, "Invalid port");
-                    
-                    goto loaderr;
-                }
+                g_server.verbosity = MY_DEBUG;
             }
-            else if (0 == strcasecmp(key, "bind"))
+            else if (0 == strcasecmp(value, "verbose")) 
             {
-                strcpy(g_server.bindaddr, value);
+                g_server.verbosity = MY_VERBOSE;
             }
-            else if (0 == strcasecmp(key, "timeout"))
+            else if (0 == strcasecmp(value, "notice")) 
             {
-                g_server.maxidletime = atoi(value);
-                if (g_server.maxidletime < 0) 
-                {
-                    myepollLog(MY_WARNING, "Invalid timeout value");
-                    
-                    goto loaderr;
-                }
+                g_server.verbosity = MY_NOTICE;
             }
-            else if (0 == strcasecmp(key, "loglevel"))
+            else if (0 == strcasecmp(value, "warning"))
             {
-                if (0 == strcasecmp(value, "debug")) 
-                {
-                    g_server.verbosity = MY_DEBUG;
-                }
-                else if (0 == strcasecmp(value, "verbose")) 
-                {
-                    g_server.verbosity = MY_VERBOSE;
-                }
-                else if (0 == strcasecmp(value, "notice")) 
-                {
-                    g_server.verbosity = MY_NOTICE;
-                }
-                else if (0 == strcasecmp(value, "warning"))
-                {
-                    g_server.verbosity = MY_WARNING;
-                }
-                else 
-                {
-                    myepollLog(MY_WARNING, "Invalid log level. Must be one of debug, notice, warning");
-                    
-                    goto loaderr;
-                }
+                g_server.verbosity = MY_WARNING;
             }
-            else if (0 == strcasecmp(key, "logfile"))
+            else 
             {
-                if (0 != strcasecmp(value, "stdout")) 
-                {
-                    strcpy(g_server.logfile, value);
-                    
-                    /**
-                     * Test if we are able to open the file. The server will not
-                     * be able to abort just for this problem later... 
-                     */
-                    FILE *logfp = fopen(g_server.logfile, "a");
-                    if (NULL == logfp)
-                    {
-                        myepollLog(MY_WARNING, "Can't open the log file: %s", strerror(errno));
-                    
-                        goto loaderr;
-                    }
-                    
-                    fclose(logfp);
-                }
+                myepollLog(MY_WARNING, 
+                           "Argument must be debug, notice or warning at line %d", line);
+                
+                nRet = -1;
+            
+			    break;
             }
-            else if (0 == strcasecmp(key, "maxclients"))
+        }
+        else if (0 == strcasecmp(name, "logfile"))
+        {
+            if (0 != strcasecmp(value, "stdout")) 
             {
-                g_server.maxclients = atoi(value);
-                if (g_server.maxclients < 1) 
+                strcpy(g_server.logfile, value);
+                
+                /**
+                 * Test if we are able to open the file. The server will not
+                 * be able to abort just for this problem later... 
+                 */
+                FILE *logfp = fopen(g_server.logfile, "a");
+                if (NULL == logfp)
                 {
-                    myepollLog(MY_WARNING, "Invalid max clients limit");
-                    
-                    goto loaderr;
+                    myepollLog(MY_WARNING, 
+                               "Can't open the log file '%s'", g_server.logfile);
+                
+                    nRet = -1;
+            
+			        break;
                 }
+                
+                fclose(logfp);
             }
-            else if (0 == strcasecmp(key, "maxthreads"))
+        }
+        else if (0 == strcasecmp(name, "maxclients"))
+        {
+            g_server.maxclients = atoi(value);
+            if (g_server.maxclients < 1) 
             {
-                g_server.maxthreads = atoi(value);
-                if (g_server.maxthreads < 1) 
-                {
-                    myepollLog(MY_WARNING, "Invalid max threads limit");
-                    
-                    goto loaderr;
-                }
+                myepollLog(MY_WARNING, 
+                           "Invalid max clients limit at line %d", line);
+                
+                nRet = -1;
+            
+			    break;
+            }
+        }
+        else if (0 == strcasecmp(name, "maxthreads"))
+        {
+            g_server.maxthreads = atoi(value);
+            if (g_server.maxthreads < 1) 
+            {
+                myepollLog(MY_WARNING, 
+                           "Invalid max threads limit at line %d", line);
+                
+                nRet = -1;
+            
+			    break;
             }
         }
         else
         {
-            myepollLog(MY_WARNING, 
-                       "Fatal error, Invalid '%s' value", buf);
-                       
-            goto loaderr;
+            myepollLog(MY_NOTICE, 
+                       "Invalid argument at line %d", line);
         }
-        
-        memset(buf, 0x00, sizeof(buf));
-        linenum++;
-    }
-    
-    if (line)
-    {
-        free(line);
     }
        
     if (fp != stdin) 
@@ -296,23 +322,7 @@ int loadServerConfig(char *filename)
         fclose(fp);
     }
     
-    return 0;
-    
-loaderr:
-    myepollLog(MY_WARNING, 
-               "Reading the configuration file err, at line %d", linenum);
-    
-    if (line)
-    {
-        free(line);
-    }
-       
-    if (fp != stdin) 
-    {
-        fclose(fp);
-    }
-    
-    return -1;
+    return nRet;
 }
 
 void createPidFile(void) 
@@ -330,9 +340,7 @@ void createPidFile(void)
 
 void daemonize(void) 
 {
-    int fd = -1;
-
-    if (fork() != 0) 
+    if (0 != fork()) 
     {
         exit(0); // parent exits
     }
@@ -344,7 +352,8 @@ void daemonize(void)
      * the 'logfile' is set to 'stdout' in the configuration file
      * it will not log at all. 
      */
-    if ((fd = open("/dev/null", O_RDWR, 0)) != -1) 
+    int fd = open("/dev/null", O_RDWR, 0);
+    if (-1 != fd) 
     {
         dup2(fd, STDIN_FILENO);
         dup2(fd, STDOUT_FILENO);

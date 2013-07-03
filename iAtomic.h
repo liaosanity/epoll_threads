@@ -437,7 +437,7 @@ static __inline__ void atomic_sub(int i, atomic_t * v)
 	:"Ir" (i), "m" (v->counter));
 }
 
-/*
+/**
  * Same as above, but return the result value
  */
 static __inline__ long atomic_add_return(int i, atomic_t * v)
@@ -639,7 +639,7 @@ static __inline__ int atomic_dec_return(atomic_t *v)
 #define atomic_sub_and_test(a, v)	(atomic_sub_return((a), (v)) == 0)
 #define atomic_dec_and_test(v)		(atomic_dec_return((v)) == 0)
 
-/*
+/**
  * Atomically test *v and decrement if it is greater than 0.
  * The function returns the old value of *v minus 1.
  */
@@ -662,7 +662,7 @@ static __inline__ int atomic_dec_if_positive(atomic_t *v)
 	return t;
 }
 
-/*
+/**
  * Memory barrier.
  * The sync instruction guarantees that all memory accesses initiated
  * by this processor have been performed (with respect to all other
@@ -692,7 +692,7 @@ typedef struct { volatile int counter; } atomic_t;
 
 #define ATOMIC_INIT(i)    { (i) }
 
-/*
+/**
  * atomic_read - read atomic variable
  * @v: pointer of type atomic_t
  *
@@ -701,7 +701,7 @@ typedef struct { volatile int counter; } atomic_t;
  */
 #define atomic_read(v)	((v)->counter)
 
-/*
+/**
  * atomic_set - set atomic variable
  * @v: pointer of type atomic_t
  * @i: required value
@@ -711,12 +711,12 @@ typedef struct { volatile int counter; } atomic_t;
  */
 #define atomic_set(v,i)	((v)->counter = (i))
 
-/*
+/**
  * for MIPS II and better we can use ll/sc instruction, and kernel 2.4.3+
  * will emulate it on MIPS I.
  */
 
-/*
+/**
  * atomic_add - add integer to atomic variable
  * @i: integer value to add
  * @v: pointer of type atomic_t
@@ -740,7 +740,7 @@ extern __inline__ void atomic_add(int i, atomic_t * v)
 		: "Ir" (i), "m" (v->counter));
 }
 
-/*
+/**
  * atomic_sub - subtract the atomic variable
  * @i: integer value to subtract
  * @v: pointer of type atomic_t
@@ -764,7 +764,7 @@ extern __inline__ void atomic_sub(int i, atomic_t * v)
 		: "Ir" (i), "m" (v->counter));
 }
 
-/*
+/**
  * Same as above, but return the result value
  */
 extern __inline__ int atomic_add_return(int i, atomic_t * v)
@@ -812,7 +812,7 @@ extern __inline__ int atomic_sub_return(int i, atomic_t * v)
 #define atomic_dec_return(v) atomic_sub_return(1,(v))
 #define atomic_inc_return(v) atomic_add_return(1,(v))
 
-/*
+/**
  * atomic_sub_and_test - subtract value from variable and test result
  * @i: integer value to subtract
  * @v: pointer of type atomic_t
@@ -824,7 +824,7 @@ extern __inline__ int atomic_sub_return(int i, atomic_t * v)
  */
 #define atomic_sub_and_test(i,v) (atomic_sub_return((i), (v)) == 0)
 
-/*
+/**
  * atomic_inc_and_test - increment and test
  * @v: pointer of type atomic_t
  *
@@ -835,7 +835,7 @@ extern __inline__ int atomic_sub_return(int i, atomic_t * v)
  */
 #define atomic_inc_and_test(v) (atomic_inc_return(1, (v)) == 0)
 
-/*
+/**
  * atomic_dec_and_test - decrement by 1 and test
  * @v: pointer of type atomic_t
  *
@@ -846,7 +846,7 @@ extern __inline__ int atomic_sub_return(int i, atomic_t * v)
  */
 #define atomic_dec_and_test(v) (atomic_sub_return(1, (v)) == 0)
 
-/*
+/**
  * atomic_inc - increment atomic variable
  * @v: pointer of type atomic_t
  *
@@ -855,7 +855,7 @@ extern __inline__ int atomic_sub_return(int i, atomic_t * v)
  */
 #define atomic_inc(v) atomic_add(1,(v))
 
-/*
+/**
  * atomic_dec - decrement and test
  * @v: pointer of type atomic_t
  *
@@ -864,7 +864,7 @@ extern __inline__ int atomic_sub_return(int i, atomic_t * v)
  */
 #define atomic_dec(v) atomic_sub(1,(v))
 
-/*
+/**
  * atomic_add_negative - add and test if negative
  * @v: pointer of type atomic_t
  * @i: integer value to add
@@ -896,11 +896,11 @@ __asm__ __volatile__(					\
 
 #ifdef __arm__
 
-/*
+/**
  * FIXME: bellow code is valid only for SA11xx
  */
 
-/*
+/**
  * Save the current interrupt enable state & disable IRQs
  */
 #define local_irq_save(x)					\
@@ -915,7 +915,7 @@ __asm__ __volatile__(					\
 	: "memory");						\
 	})
 
-/*
+/**
  * restore saved IRQ & FIQ state
  */
 #define local_irq_restore(x)					\
@@ -1015,7 +1015,7 @@ static __inline__ void atomic_clear_mask(unsigned long mask, unsigned long *addr
 #endif /* __arm__ */
 
 #ifndef IATOMIC_DEFINED
-/*
+/**
  * non supported architecture.
  */
 #warning "Atomic operations are not supported on this architecture."
@@ -1039,23 +1039,27 @@ typedef struct { volatile int counter; } atomic_t;
 
 #endif /* IATOMIC_DEFINED */
 
-/*
+/**
  *  Atomic read/write
  *  Copyright (c) 2001 by Abramo Bagnara <abramo@alsa-project.org>
  */
 
-/* Max number of times we must spin on a spin-lock calling sched_yield().
-   After MAX_SPIN_COUNT iterations, we put the calling thread to sleep. */
+/** 
+ * Max number of times we must spin on a spin-lock calling sched_yield().
+ * After MAX_SPIN_COUNT iterations, we put the calling thread to sleep. 
+ */
 
 #ifndef MAX_SPIN_COUNT
 #define MAX_SPIN_COUNT 50
 #endif
 
-/* Duration of sleep (in nanoseconds) when we can't acquire a spin-lock
-   after MAX_SPIN_COUNT iterations of sched_yield().
-   This MUST BE > 2ms.
-   (Otherwise the kernel does busy-waiting for real-time threads,
-    giving other threads no chance to run.) */
+/**
+ * Duration of sleep (in nanoseconds) when we can't acquire a spin-lock
+ * after MAX_SPIN_COUNT iterations of sched_yield().
+ * This MUST BE > 2ms.
+ * (Otherwise the kernel does busy-waiting for real-time threads,
+ * giving other threads no chance to run.) 
+ */
 
 #ifndef SPIN_SLEEP_DURATION
 #define SPIN_SLEEP_DURATION 2000001

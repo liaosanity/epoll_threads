@@ -150,10 +150,10 @@ int ListenThread::AssignTask(int sockfd)
 	    return 0;
 	}
 
-	int iRet = m_taskthread[target]->i_epoll_add(sockfd,
+	int nRet = m_taskthread[target]->i_epoll_add(sockfd,
 	                                             I_EPOLL_WRITE, 
 	                                             I_EPOLL_EDGE_TRIGGERED);
-	if (0 == iRet) 
+	if (0 == nRet) 
 	{
 		m_taskthread[target]->IncrementActiveConns();        
 	}

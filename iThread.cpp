@@ -30,16 +30,16 @@ void *iThread::ThreadFun(void *arg)
 	iThread *piThread = (iThread*)arg;
 	piThread->Run();
 
-	return (void *)0;
+	return (void *)NULL;
 }
 
 int iThread::Create()
 {
-	int iRet = pthread_create(&m_pid, NULL, ThreadFun, this);
-	if (0 == iRet)
+	int nRet = pthread_create(&m_pid, NULL, ThreadFun, this);
+	if (0 == nRet)
 	{
-		iRet = pthread_detach(m_pid);
-		if (0 == iRet)
+		nRet = pthread_detach(m_pid);
+		if (0 == nRet)
 		{
 			return 0;
 		}

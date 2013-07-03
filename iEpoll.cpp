@@ -49,7 +49,7 @@ int iEpoll::i_epoll_wait()
 	int i = 0;
 	int sockfd = -1;
 	int num_fds = 0;
-	int iRet = -1;
+	int nRet = -1;
 
 	while (1) 
 	{
@@ -63,24 +63,24 @@ int iEpoll::i_epoll_wait()
 			{
 				//myepollLog(MY_DEBUG, "EPoll Event READ sockfd=%d", sockfd);
 
-				iRet = iRead(sockfd);
+				nRet = iRead(sockfd);
 			}
 			else if (m_events[i].events & EPOLLOUT) 
 			{
 				//myepollLog(MY_DEBUG, "EPoll Event WRITE sockfd=%d", sockfd);
 
-				iRet = iWrite(sockfd); 
+				nRet = iWrite(sockfd); 
 			}
 			else if (m_events[i].events & (EPOLLHUP | EPOLLERR | EPOLLRDHUP)) 
 			{
 				//myepollLog(MY_DEBUG, "EPoll Event EPOLLHUP/EPOLLER sockfd=%d", sockfd);
 
-				iRet = iError(sockfd);
+				nRet = iError(sockfd);
 			}
 
-			if (iRet < 0) 
+			if (nRet < 0) 
 			{
-				//myepollLog(MY_DEBUG, "Client %d is closed, iRet=%d", sockfd, iRet);
+				//myepollLog(MY_DEBUG, "Client %d is closed, nRet=%d", sockfd, nRet);
 
 				iClose(sockfd);
 			}
@@ -117,24 +117,24 @@ int iEpoll::i_epoll_add(int sockfd, int init_mode, int behavior)
 		break;
 	}
 
-	int iRet = epoll_ctl(m_epfd, EPOLL_CTL_ADD, sockfd, &ev);
-	if (iRet < 0) 
+	int nRet = epoll_ctl(m_epfd, EPOLL_CTL_ADD, sockfd, &ev);
+	if (nRet < 0) 
 	{
 		myepollLog(MY_WARNING, "epoll_ctl() err, sockfd=%d", sockfd);
 	}
 
-	return iRet;
+	return nRet;
 }
 
 int iEpoll::i_epoll_del(int sockfd)
 {
-	int iRet = epoll_ctl(m_epfd, EPOLL_CTL_DEL, sockfd, NULL);
-	if (iRet < 0) 
+	int nRet = epoll_ctl(m_epfd, EPOLL_CTL_DEL, sockfd, NULL);
+	if (nRet < 0) 
 	{
 		myepollLog(MY_WARNING, "epoll_ctl() err, sockfd=%d", sockfd);
 	}
 
-	return iRet;
+	return nRet;
 }
 
 int iEpoll::i_epoll_change_mode(int sockfd, int mode, int behavior)
@@ -170,11 +170,11 @@ int iEpoll::i_epoll_change_mode(int sockfd, int mode, int behavior)
 		break;
 	}
 
-	int iRet = epoll_ctl(m_epfd, EPOLL_CTL_MOD, sockfd, &ev);
-	if (iRet < 0) 
+	int nRet = epoll_ctl(m_epfd, EPOLL_CTL_MOD, sockfd, &ev);
+	if (nRet < 0) 
 	{
 		myepollLog(MY_WARNING, "epoll_ctl() err, sockfd=%d", sockfd);
 	}
 
-	return iRet;
+	return nRet;
 }

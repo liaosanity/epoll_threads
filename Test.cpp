@@ -128,7 +128,7 @@ void myepollLogRaw(int level, const char *msg)
     }
 
     FILE * fp = (0 == strcmp(g_server.logfile, "")) 
-              ? stdout : fopen(g_server.logfile, "a");
+                ? stdout : fopen(g_server.logfile, "a");
     if (!fp) 
     {
         return;
@@ -303,6 +303,8 @@ int main(int argc, char **argv)
 		if (NULL == pTest)
 		{
 			myepollLog(MY_WARNING, "new Test() err");
+			
+			continue;
 		}
 
 		g_Test.push_back(pTest);
@@ -313,7 +315,7 @@ int main(int argc, char **argv)
 		{
 			myepollLog(MY_WARNING, "[%d]Connect server[%s:%d] err", i, ip, port);
 			
-			return -1;
+			kill(getpid(), SIGTERM);
 		}
 
 		pTest->AddEpollEvents(I_EPOLL_READ, I_EPOLL_EDGE_TRIGGERED);

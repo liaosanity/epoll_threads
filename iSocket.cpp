@@ -59,8 +59,8 @@ int iSocket::Bind(char *bindaddr, unsigned short nPort, int &sockfd)
         return -1;
     }
 
-	int iRet = bind(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr));
-	if (-1 == iRet)
+	int nRet = bind(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr));
+	if (-1 == nRet)
 	{
 		myepollLog(MY_WARNING, "Bind err");
 		
@@ -69,8 +69,8 @@ int iSocket::Bind(char *bindaddr, unsigned short nPort, int &sockfd)
 		return -1;
 	}
 
-	iRet = listen(sockfd, LISTEN_POOL_SZ);
-	if (-1 == iRet)
+	nRet = listen(sockfd, LISTEN_POOL_SZ);
+	if (-1 == nRet)
 	{
 		myepollLog(MY_WARNING, "Listen err");
 		
@@ -150,8 +150,8 @@ int iSocket::Connect(char *pRemoteIp, unsigned short nPort, int &sockfd)
 	servaddr.sin_port = htons(nPort);
 	servaddr.sin_addr.s_addr = inet_addr(pRemoteIp);
 
-	int iRet = connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr));
-	if (iRet < 0) 
+	int nRet = connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr));
+	if (nRet < 0) 
 	{
 		myepollLog(MY_WARNING, "connect() err");
 
