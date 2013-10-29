@@ -1,8 +1,8 @@
 #include "Test.h"
 
 Test::Test(int nCapacity)
-: m_sockfd(-1)
-, iEpoll(nCapacity)
+: iEpoll(nCapacity)
+, m_sockfd(-1)
 {
 	m_socket = new iSocket();
 	if (NULL == m_socket)
@@ -67,7 +67,7 @@ int Test::iWrite(int sockfd)
 	poll(NULL, 0, 1000);
 
 	char sBuf[MIN_BUFSZ] = "";
-	sprintf(sBuf, "Hi server, i'am %d %d", sockfd, t_timeval.tv_usec);
+	sprintf(sBuf, "Hi server, i'am %d %d", sockfd, (int)t_timeval.tv_usec);
 
 	int bytes = m_socket->sendn(sockfd, sBuf, strlen(sBuf));
 	if (bytes <= 0)
@@ -109,27 +109,28 @@ int Test::iTimeout(int sockfd)
 /**
  * Global handler
  */
-struct myServer g_server; // server global state
+SERVER g_Server; // server global state
 deque<Test *> g_Test;
+pthread_mutex_t g_LogFileMutex = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * Low level logging. To use only for very big messages, otherwise
  * myepollLog() is to prefer. 
  */
-void myepollLogRaw(int level, const char *msg) 
+static void myepollLogRaw(int level, const char *msg) 
 {
     const char *c = ".-*#";
     int rawmode = (level & MY_LOG_RAW);
 
     level &= 0xff; // clear flags
-    if (level < g_server.verbosity) 
+    if (level < g_Server.verbosity) 
     {
         return;
     }
 
-    FILE * fp = (0 == strcmp(g_server.logfile, "")) 
-                ? stdout : fopen(g_server.logfile, "a");
-    if (!fp) 
+    FILE *fp = (0 == strcmp(g_Server.logfile, "")) 
+                ? stdout : fopen(g_Server.logfile, "a");
+    if (NULL == fp) 
     {
         return;
     }
@@ -152,26 +153,26 @@ void myepollLogRaw(int level, const char *msg)
         switch (level)
         {
         case MY_NOTICE:
-            fprintf(fp, "%s[%u] %s %c %s%s\n", 
+            fprintf(fp, "%s[%ld] %s %c %s%s\n", 
                     ANSI_YELLOW, syscall(__NR_gettid), 
                     buf, c[level], msg, ANSI_RESET);
             break;
             
         case MY_WARNING:
-            fprintf(fp, "%s[%u] %s %c %s%s\n", 
+            fprintf(fp, "%s[%ld] %s %c %s%s\n", 
                     ANSI_RED, syscall(__NR_gettid), 
                     buf, c[level], msg, ANSI_RESET);
             break;
             
         default:
-            fprintf(fp, "[%u] %s %c %s\n", 
+            fprintf(fp, "[%ld] %s %c %s\n", 
                     syscall(__NR_gettid), buf, c[level], msg);
         }
     }
     
     fflush(fp);
 
-    if (0 != strcmp(g_server.logfile, "")) 
+    if (0 != strcmp(g_Server.logfile, "")) 
     {
         fclose(fp);
     }
@@ -184,10 +185,12 @@ void myepollLogRaw(int level, const char *msg)
  */
 void myepollLog(int level, const char *fmt, ...) 
 {
+    pthread_mutex_lock(&g_LogFileMutex);
+    
     va_list ap;
     char msg[MY_MAX_LOGMSG_LEN] = "";
 
-    if ((level & 0xff) < g_server.verbosity) 
+    if ((level & 0xff) < g_Server.verbosity) 
     {
         return;
     }
@@ -197,13 +200,17 @@ void myepollLog(int level, const char *fmt, ...)
     va_end(ap);
 
     myepollLogRaw(level, msg);
+    
+    pthread_mutex_unlock(&g_LogFileMutex);
 }
 
 static void sigtermHandler(int sig)
 {
 	myepollLog(MY_NOTICE, "Received SIGTERM, scheduling shutdown >:( ...");
 
-	for (int i=0; i<g_Test.size(); i++)
+    g_Server.shutdown = true;
+
+	for (int i=0; i<(int)g_Test.size(); i++)
 	{
 		Test *pTest = g_Test[i];
 		if (NULL != pTest)
@@ -214,6 +221,8 @@ static void sigtermHandler(int sig)
 	}
 
 	g_Test.clear();
+	
+	sleep(1);
 
 	_exit(EXIT_SUCCESS);
 }
@@ -288,7 +297,8 @@ int main(int argc, char **argv)
 		}
 	}
 	
-	memset(&g_server, 0x00, sizeof(struct myServer));
+	memset(&g_Server, 0x00, sizeof(SERVER));
+	g_Server.shutdown = false;
 
 	signal(SIGHUP, SIG_IGN);
     signal(SIGPIPE, SIG_IGN);

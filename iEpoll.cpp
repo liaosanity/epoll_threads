@@ -51,7 +51,7 @@ int iEpoll::i_epoll_wait()
 	int num_fds = 0;
 	int nRet = -1;
 
-	while (1) 
+	while (!g_Server.shutdown) 
 	{
 		num_fds = epoll_wait(m_epfd, m_events, m_maxevents, I_EPOLL_WAIT_TIMEOUT);
 
@@ -120,7 +120,8 @@ int iEpoll::i_epoll_add(int sockfd, int init_mode, int behavior)
 	int nRet = epoll_ctl(m_epfd, EPOLL_CTL_ADD, sockfd, &ev);
 	if (nRet < 0) 
 	{
-		myepollLog(MY_WARNING, "epoll_ctl() err, sockfd=%d", sockfd);
+		myepollLog(MY_WARNING, "epoll_ctl() add err(%s), sockfd=%d", 
+		           strerror(errno), sockfd);
 	}
 
 	return nRet;
@@ -131,7 +132,8 @@ int iEpoll::i_epoll_del(int sockfd)
 	int nRet = epoll_ctl(m_epfd, EPOLL_CTL_DEL, sockfd, NULL);
 	if (nRet < 0) 
 	{
-		myepollLog(MY_WARNING, "epoll_ctl() err, sockfd=%d", sockfd);
+		myepollLog(MY_WARNING, "epoll_ctl() del err(%s), sockfd=%d", 
+		           strerror(errno), sockfd);
 	}
 
 	return nRet;
@@ -173,7 +175,8 @@ int iEpoll::i_epoll_change_mode(int sockfd, int mode, int behavior)
 	int nRet = epoll_ctl(m_epfd, EPOLL_CTL_MOD, sockfd, &ev);
 	if (nRet < 0) 
 	{
-		myepollLog(MY_WARNING, "epoll_ctl() err, sockfd=%d", sockfd);
+		myepollLog(MY_WARNING, "epoll_ctl() mod err(%s), sockfd=%d", 
+		           strerror(errno), sockfd);
 	}
 
 	return nRet;

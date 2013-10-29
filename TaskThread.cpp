@@ -63,7 +63,7 @@ int TaskThread::iWrite(int sockfd)
 	gettimeofday(&t_timeval, NULL);
 
 	char sBuf[MIN_BUFSZ] = "";
-	sprintf(sBuf, "Hi %d welcome %d", sockfd, t_timeval.tv_usec);
+	sprintf(sBuf, "Hi %d welcome %d", sockfd, (int)t_timeval.tv_usec);
 
 	int bytes = m_socket->sendn(sockfd, sBuf, strlen(sBuf));
 	if (bytes <= 0)

@@ -37,7 +37,7 @@ void ListenThread::Run()
 
 	int sockfd = -1; 
 
-	while (1)
+	while (!g_Server.shutdown)
 	{
 		if (0 == m_socket->Listen(m_sockfd, sockfd))
 		{
@@ -48,9 +48,9 @@ void ListenThread::Run()
 
 int ListenThread::Bind()
 {
-	if (-1 == m_socket->Bind(g_server.bindaddr, g_server.port, m_sockfd))
+	if (-1 == m_socket->Bind(g_Server.bindaddr, g_Server.port, m_sockfd))
 	{
-		myepollLog(MY_WARNING, "Bind port %d err" , g_server.port);
+		myepollLog(MY_WARNING, "Bind port %d err" , g_Server.port);
 
 		return -1;
 	}
@@ -66,7 +66,7 @@ int ListenThread::InitTaskThread()
 
 	int nCapacity = GetWorkerCapacity();
 
-	for (int i=0; i<g_server.maxthreads; i++)
+	for (int i=0; i<g_Server.maxthreads; i++)
 	{
 		TaskThread *pTaskThread = new TaskThread(nCapacity);
 		if (NULL == pTaskThread)
@@ -86,7 +86,7 @@ int ListenThread::InitTaskThread()
 
 int ListenThread::DelTaskThread()
 {
-	for (int i=0; i<m_taskthread.size(); i++)
+	for (int i=0; i<(int)m_taskthread.size(); i++)
 	{
 		TaskThread *pTaskThread = m_taskthread[i];
 		if (NULL != pTaskThread)
@@ -114,14 +114,14 @@ int ListenThread::GetWorkerCapacity()
 	 * 1 fd for main socket server
 	 * 1 fd for epoll array (per thread)
 	 */
-	int avl = max - (3 + 1 + g_server.maxthreads);
+	int avl = max - (3 + 1 + g_Server.maxthreads);
 
 	/** 
 	 * The avl is divided by two as we need to consider
 	 * a possible additional FD for each plugin working
 	 * on the same request.
 	 */
-	return ((avl / 2) / g_server.maxthreads);
+	return ((avl / 2) / g_Server.maxthreads);
 }
 
 int ListenThread::AssignTask(int sockfd)
@@ -129,7 +129,7 @@ int ListenThread::AssignTask(int sockfd)
 	int target = 1;
 	int activeConns = 1;
 
-	for (int i=0; i<m_taskthread.size(); i++)
+	for (int i=0; i<(int)m_taskthread.size(); i++)
 	{
 	    activeConns += m_taskthread[i]->GetActiveConns();
 	    
@@ -140,10 +140,10 @@ int ListenThread::AssignTask(int sockfd)
 		}
 	}
 	
-	if (activeConns > g_server.maxclients)
+	if (activeConns > g_Server.maxclients)
 	{
 	    myepollLog(MY_NOTICE, "Max number of clients(%d) reached", 
-	               g_server.maxclients);
+	               g_Server.maxclients);
 	    
 	    close(sockfd);
 	    

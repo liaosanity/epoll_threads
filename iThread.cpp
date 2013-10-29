@@ -27,7 +27,7 @@ pthread_t iThread::GetThreadID()
 
 void *iThread::ThreadFun(void *arg)
 {
-	iThread *piThread = (iThread*)arg;
+	iThread *piThread = (iThread *)arg;
 	piThread->Run();
 
 	return (void *)NULL;

@@ -33,7 +33,7 @@ using namespace std;
 #define MY_VERBOSE 1
 #define MY_NOTICE 2
 #define MY_WARNING 3
-#define MY_LOG_RAW (1<<10) // Modifier to log without timestamp
+#define MY_LOG_RAW (1 << 10) // Modifier to log without timestamp
 
 /**
  * ANSI Colors
@@ -86,8 +86,9 @@ using namespace std;
 /**
  * Global server state
  */
-struct myServer 
+typedef struct tagSERVER 
 {
+    bool shutdown;              // Shutdown need to set 'true'
     char pidfile[MIN_BUFSZ];    // PID file path
     int port;                   // TCP listening port
     char bindaddr[MIN_BUFSZ];   // Bind address or NULL
@@ -95,18 +96,18 @@ struct myServer
     int maxidletime;            // Client timeout in seconds
     int daemonize;              // True if running as a daemon
     char logfile[MIN_BUFSZ];    // Path of log file
-    unsigned int maxclients;    // Max number of simultaneous clients
-    unsigned int maxthreads;    // Max number of worker threads
-};
+    int maxclients;    // Max number of simultaneous clients
+    int maxthreads;    // Max number of worker threads
+} SERVER;
 
 /**
  * Extern declarations
  */
-extern struct myServer g_server;
+extern SERVER g_Server;
 
 /** 
  * Core functions 
  */
-void myepollLog(int level, const char *fmt, ...);
+extern void myepollLog(int level, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 
 #endif

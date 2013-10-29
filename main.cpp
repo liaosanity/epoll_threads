@@ -4,27 +4,28 @@
 /**
  * Global vars 
  */
-struct myServer g_server; // server global state
+SERVER g_Server; // server global state
 static ListenThread *g_ListenThread = NULL;
+pthread_mutex_t g_LogFileMutex = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * Low level logging. To use only for very big messages, otherwise
  * myepollLog() is to prefer. 
  */
-void myepollLogRaw(int level, const char *msg) 
+static void myepollLogRaw(int level, const char *msg) 
 {
     const char *c = ".-*#";
     int rawmode = (level & MY_LOG_RAW);
 
     level &= 0xff; // clear flags
-    if (level < g_server.verbosity) 
+    if (level < g_Server.verbosity) 
     {
         return;
     }
 
-    FILE * fp = (0 == strcmp(g_server.logfile, "")) 
-                ? stdout : fopen(g_server.logfile, "a");
-    if (!fp) 
+    FILE *fp = (0 == strcmp(g_Server.logfile, "")) 
+                ? stdout : fopen(g_Server.logfile, "a");
+    if (NULL == fp) 
     {
         return;
     }
@@ -47,26 +48,26 @@ void myepollLogRaw(int level, const char *msg)
         switch (level)
         {
         case MY_NOTICE:
-            fprintf(fp, "%s[%u] %s %c %s%s\n", 
+            fprintf(fp, "%s[%ld] %s %c %s%s\n", 
                     ANSI_YELLOW, syscall(__NR_gettid), 
                     buf, c[level], msg, ANSI_RESET);
             break;
             
         case MY_WARNING:
-            fprintf(fp, "%s[%u] %s %c %s%s\n", 
+            fprintf(fp, "%s[%ld] %s %c %s%s\n", 
                     ANSI_RED, syscall(__NR_gettid), 
                     buf, c[level], msg, ANSI_RESET);
             break;
             
         default:
-            fprintf(fp, "[%u] %s %c %s\n", 
+            fprintf(fp, "[%ld] %s %c %s\n", 
                     syscall(__NR_gettid), buf, c[level], msg);
         }
     }
     
     fflush(fp);
 
-    if (0 != strcmp(g_server.logfile, "")) 
+    if (0 != strcmp(g_Server.logfile, "")) 
     {
         fclose(fp);
     }
@@ -79,10 +80,12 @@ void myepollLogRaw(int level, const char *msg)
  */
 void myepollLog(int level, const char *fmt, ...) 
 {
+    pthread_mutex_lock(&g_LogFileMutex);
+    
     va_list ap;
     char msg[MY_MAX_LOGMSG_LEN] = "";
 
-    if ((level & 0xff) < g_server.verbosity) 
+    if ((level & 0xff) < g_Server.verbosity) 
     {
         return;
     }
@@ -92,20 +95,23 @@ void myepollLog(int level, const char *fmt, ...)
     va_end(ap);
 
     myepollLogRaw(level, msg);
+    
+    pthread_mutex_unlock(&g_LogFileMutex);
 }
 
-void initServerConfig() 
+static void initServerConfig() 
 {
-    memset(&g_server, 0x00, sizeof(struct myServer));
-    strcpy(g_server.pidfile, "/var/run/redis.pid");
-    g_server.port = LISTEN_PORT;
-    g_server.verbosity = MY_DEBUG;
-    g_server.maxidletime = MY_MAXIDLETIME;
-    g_server.maxclients = MY_MAX_CLIENTS;
-    g_server.maxthreads = THREAD_POOL_SZ;
+    memset(&g_Server, 0x00, sizeof(SERVER));
+    g_Server.shutdown = false;
+    strcpy(g_Server.pidfile, "/var/run/myepoll.pid");
+    g_Server.port = LISTEN_PORT;
+    g_Server.verbosity = MY_DEBUG;
+    g_Server.maxidletime = MY_MAXIDLETIME;
+    g_Server.maxclients = MY_MAX_CLIENTS;
+    g_Server.maxthreads = THREAD_POOL_SZ;
 }
 
-int loadServerConfig(char *filename) 
+static int loadServerConfig(char *filename) 
 {
     if (NULL == filename)
     {
@@ -183,11 +189,11 @@ int loadServerConfig(char *filename)
         {
             if (0 == strcasecmp(value, "yes"))
             {
-                g_server.daemonize = 1;
+                g_Server.daemonize = 1;
             }
             else if (0 == strcasecmp(value, "no")) 
             {
-                g_server.daemonize = 0;
+                g_Server.daemonize = 0;
             }
             else
             {
@@ -201,12 +207,12 @@ int loadServerConfig(char *filename)
         }
         else if (0 == strcasecmp(name, "pidfile"))
         {
-            strcpy(g_server.pidfile, value);
+            strcpy(g_Server.pidfile, value);
         }
         else if (0 == strcasecmp(name, "port"))
         {
-            g_server.port = atoi(value);
-            if (g_server.port < 0 || g_server.port > 65535) 
+            g_Server.port = atoi(value);
+            if (g_Server.port < 0 || g_Server.port > 65535) 
             {
                 myepollLog(MY_WARNING, "Invalid port at line %d", line);
                 
@@ -217,12 +223,12 @@ int loadServerConfig(char *filename)
         }
         else if (0 == strcasecmp(name, "bind"))
         {
-            strcpy(g_server.bindaddr, value);
+            strcpy(g_Server.bindaddr, value);
         }
         else if (0 == strcasecmp(name, "timeout"))
         {
-            g_server.maxidletime = atoi(value);
-            if (g_server.maxidletime < 0) 
+            g_Server.maxidletime = atoi(value);
+            if (g_Server.maxidletime < 0) 
             {
                 myepollLog(MY_WARNING, 
                            "Invalid timeout value at line %d", line);
@@ -236,19 +242,19 @@ int loadServerConfig(char *filename)
         {
             if (0 == strcasecmp(value, "debug")) 
             {
-                g_server.verbosity = MY_DEBUG;
+                g_Server.verbosity = MY_DEBUG;
             }
             else if (0 == strcasecmp(value, "verbose")) 
             {
-                g_server.verbosity = MY_VERBOSE;
+                g_Server.verbosity = MY_VERBOSE;
             }
             else if (0 == strcasecmp(value, "notice")) 
             {
-                g_server.verbosity = MY_NOTICE;
+                g_Server.verbosity = MY_NOTICE;
             }
             else if (0 == strcasecmp(value, "warning"))
             {
-                g_server.verbosity = MY_WARNING;
+                g_Server.verbosity = MY_WARNING;
             }
             else 
             {
@@ -264,17 +270,17 @@ int loadServerConfig(char *filename)
         {
             if (0 != strcasecmp(value, "stdout")) 
             {
-                strcpy(g_server.logfile, value);
+                strcpy(g_Server.logfile, value);
                 
                 /**
                  * Test if we are able to open the file. The server will not
                  * be able to abort just for this problem later... 
                  */
-                FILE *logfp = fopen(g_server.logfile, "a");
+                FILE *logfp = fopen(g_Server.logfile, "a");
                 if (NULL == logfp)
                 {
                     myepollLog(MY_WARNING, 
-                               "Can't open the log file '%s'", g_server.logfile);
+                               "Can't open the log file '%s'", g_Server.logfile);
                 
                     nRet = -1;
             
@@ -286,8 +292,8 @@ int loadServerConfig(char *filename)
         }
         else if (0 == strcasecmp(name, "maxclients"))
         {
-            g_server.maxclients = atoi(value);
-            if (g_server.maxclients < 1) 
+            g_Server.maxclients = atoi(value);
+            if (g_Server.maxclients < 1) 
             {
                 myepollLog(MY_WARNING, 
                            "Invalid max clients limit at line %d", line);
@@ -299,8 +305,8 @@ int loadServerConfig(char *filename)
         }
         else if (0 == strcasecmp(name, "maxthreads"))
         {
-            g_server.maxthreads = atoi(value);
-            if (g_server.maxthreads < 1) 
+            g_Server.maxthreads = atoi(value);
+            if (g_Server.maxthreads < 1) 
             {
                 myepollLog(MY_WARNING, 
                            "Invalid max threads limit at line %d", line);
@@ -325,12 +331,12 @@ int loadServerConfig(char *filename)
     return nRet;
 }
 
-void createPidFile(void) 
+static void createPidFile(void) 
 {
     /**
      * Try to write the pid file in a best-effort way. 
      */
-    FILE *fp = fopen(g_server.pidfile, "w");
+    FILE *fp = fopen(g_Server.pidfile, "w");
     if (fp) 
     {
         fprintf(fp, "%d\n", (int)getpid());
@@ -338,7 +344,7 @@ void createPidFile(void)
     }
 }
 
-void daemonize(void) 
+static void daemonize(void) 
 {
     if (0 != fork()) 
     {
@@ -372,23 +378,27 @@ static void sigtermHandler(int sig)
 
     myepollLog(MY_NOTICE, "Received SIGTERM, scheduling shutdown >:( ...");
     
+    g_Server.shutdown = true;
+    
     if (NULL != g_ListenThread)
 	{
 		delete g_ListenThread;
 		g_ListenThread = NULL;
 	}
 	
-	if (g_server.daemonize) 
+	if (g_Server.daemonize) 
 	{
         myepollLog(MY_NOTICE, "Removing the pid file.");
         
-        unlink(g_server.pidfile);
+        unlink(g_Server.pidfile);
     }
+    
+    sleep(1);
     
     _exit(EXIT_SUCCESS);
 }
 
-void setupSignalHandlers(void) 
+static void setupSignalHandlers(void) 
 {
     struct sigaction act;
 	memset(&act, 0x00, sizeof(act));
@@ -401,7 +411,7 @@ void setupSignalHandlers(void)
     sigaction(SIGINT, &act, NULL);
 }
 
-void initServer()
+static void initServer()
 {
     signal(SIGHUP, SIG_IGN);
     signal(SIGPIPE, SIG_IGN);
@@ -447,14 +457,14 @@ int main(int argc, char **argv)
         return -1;
     }
     
-    if (g_server.daemonize) 
+    if (g_Server.daemonize) 
     {
         daemonize();
     }
     
     initServer();
     
-    if (g_server.daemonize) 
+    if (g_Server.daemonize) 
     {
         createPidFile();
     }
@@ -469,13 +479,7 @@ int main(int argc, char **argv)
 
 	if (-1 == g_ListenThread->Bind())
 	{
-	    if (NULL != g_ListenThread)
-    	{
-    		delete g_ListenThread;
-    		g_ListenThread = NULL;
-    	}
-	
-	    return -1;
+	    kill(getpid(), SIGTERM);
 	}
 
 	myepollLog(MY_NOTICE, "Epoll server is running :) ... (press CTRL-C to stop)");

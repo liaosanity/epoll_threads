@@ -1,5 +1,5 @@
 APP = epoll_server
-CXX = g++ -g -O3 -pthread -march=native -std=c++0x
+CXX = g++ -g -Wall -O3 -march=native -std=c++0x -pthread
 
 OBJS = main.o ListenThread.o TaskThread.o iThread.o iEpoll.o iSocket.o 
 TEST = Test.o iThread.o iEpoll.o iSocket.o 
