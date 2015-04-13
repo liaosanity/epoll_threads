@@ -65,13 +65,15 @@ int iEpoll::i_epoll_wait()
 
 				nRet = iRead(sockfd);
 			}
-			else if (m_events[i].events & EPOLLOUT) 
+			
+			if (m_events[i].events & EPOLLOUT) 
 			{
 				//myepollLog(MY_DEBUG, "EPoll Event WRITE sockfd=%d", sockfd);
 
 				nRet = iWrite(sockfd); 
 			}
-			else if (m_events[i].events & (EPOLLHUP | EPOLLERR | EPOLLRDHUP)) 
+			
+			if (m_events[i].events & (EPOLLHUP | EPOLLERR | EPOLLRDHUP)) 
 			{
 				//myepollLog(MY_DEBUG, "EPoll Event EPOLLHUP/EPOLLER sockfd=%d", sockfd);
 
